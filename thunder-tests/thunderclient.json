@@ -1,0 +1,74 @@
+[
+  {
+    "_id": "3e906805-6d63-4da5-9d71-b064f54377b9",
+    "colId": "9549c918-ab08-467d-8f5c-6da4ddc27793",
+    "containerId": "",
+    "name": "submit-tea-1",
+    "url": "http://localhost:1333/submit-order",
+    "method": "POST",
+    "sortNum": 10000,
+    "created": "2023-02-22T14:13:09.057Z",
+    "modified": "2023-02-22T14:13:09.057Z",
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"coffeeOrder\": [\n    {\n      \"product\": \"TEA\",\n      \"count\": 1\n    }\n  ]\n}",
+      "form": []
+    },
+    "tests": []
+  },
+  {
+    "_id": "2f38ee35-22b5-4475-a701-04d6eaf8d7f4",
+    "colId": "9549c918-ab08-467d-8f5c-6da4ddc27793",
+    "containerId": "",
+    "name": "submit-coffee-3",
+    "url": "http://localhost:1333/submit-order",
+    "method": "POST",
+    "sortNum": 30000,
+    "created": "2023-02-22T14:13:36.126Z",
+    "modified": "2023-02-22T14:13:36.126Z",
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"coffeeOrder\": [\n    {\n      \"product\": \"COFFEE\",\n      \"count\": 3\n    }\n  ]\n}",
+      "form": []
+    },
+    "tests": []
+  },
+  {
+    "_id": "38671a55-dea7-4337-bf3a-4f0f6a914e92",
+    "colId": "9549c918-ab08-467d-8f5c-6da4ddc27793",
+    "containerId": "",
+    "name": "submit-complex",
+    "url": "http://localhost:1333/submit-order",
+    "method": "POST",
+    "sortNum": 40000,
+    "created": "2023-02-22T16:58:33.870Z",
+    "modified": "2023-02-22T16:59:39.179Z",
+    "headers": [
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"coffeeOrder\": [\n    {\n      \"product\": \"KAKAO\",\n      \"count\": 2\n    },\n    {\n      \"product\": \"CAPPUCCINO\",\n      \"count\": 5\n    },\n    {\n      \"product\": \"HOT_WATER\",\n      \"count\": 4\n    }\n  ]\n}",
+      "form": []
+    },
+    "tests": []
+  }
+]
