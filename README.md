@@ -1,5 +1,7 @@
 # SchildCafé: Servitør
 
+![SchildCafé](logo.png)
+
 This is a [Go](https://go.dev/) implementation of the Servitør app used in the SchildCafé,
 built with [Gin Gonic](https://gin-gonic.com/) and [GORM](https://gorm.io/).
 
