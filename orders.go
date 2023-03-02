@@ -18,8 +18,10 @@ import (
 type order struct {
 	ID             string    `json:"orderId" gorm:"primaryKey"`
 	OrderReceived  time.Time `json:"orderReceived"`
-	OrderDelivered time.Time `json:"orderDelivered" gorm:"default:null"`
+	OrderReady     time.Time `json:"orderReady" gorm:"default:null"`
+	OrderRetrieved time.Time `json:"orderRetrieved" gorm:"default:null"`
 	OrderSize      int       `json:"orderSize"`
+	OrderBrewed    int       `json:"orderBrewed"`
 }
 
 type orderSubmission struct {
@@ -38,7 +40,6 @@ type coffeeListItem struct {
 	OrderID       string `json:"orderId"`
 	Order         order
 	OrderReceived time.Time `json:"orderReceived"`
-	OrderSize     int       `json:"orderSize"`
 	Machine       string    `json:"machine" gorm:"default:null"`
 	JobID         string    `json:"jobID"`
 	JobStarted    time.Time `json:"jobStarted" gorm:"default:null"`
@@ -92,7 +93,6 @@ func newOrder(sentOrderID string, orderedCoffees []orderEntry) (string, bool, in
 			newCoffee.JobID = myCoffeeIDUUID.String()
 			newCoffee.OrderID = newOrder.ID
 			newCoffee.Product = item.Product
-			newCoffee.OrderSize = newOrderSize
 			newCoffee.OrderReceived = newOrder.OrderReceived
 			coffeeList = append(coffeeList, newCoffee)
 			db.Create(&newCoffee)
@@ -119,15 +119,12 @@ func retrieveOrder(id string) (*order, bool, int, string) {
 		return nil, false, http.StatusNotFound, "Order not found!"
 	}
 
-	if !(thisOrder.OrderDelivered.IsZero()) {
+	if !(thisOrder.OrderRetrieved.IsZero()) {
 		return nil, false, http.StatusGone, "Order already delivered"
 	}
 
-	var count int
-	db.Model(&coffeeListItem{}).Where(&coffeeListItem{OrderID: id}).Where("job_retrieved IS NOT NULL").Count(&count)
-
-	if thisOrder.OrderSize == count {
-		thisOrder.OrderDelivered = time.Now().UTC()
+	if thisOrder.OrderSize == thisOrder.OrderBrewed {
+		thisOrder.OrderRetrieved = time.Now().UTC()
 		db.Save(&thisOrder)
 		return &thisOrder, true, http.StatusOK, "Order delivered"
 	}

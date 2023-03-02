@@ -34,6 +34,8 @@ export GIN_MODE="release"
 
 ## Execution
 
+Make sure to provide the MySQL credentials as environment variables.
+
 ```bash
 make run
 ```
