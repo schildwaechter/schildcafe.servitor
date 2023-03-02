@@ -64,6 +64,23 @@ func systemStatus() (int, int, string) {
 	return systemStatusCode, systemHTTPStatusCode, systemStatusMessage
 }
 
+func listOrders() []order {
+	db.Find(&orderList)
+	return orderList
+}
+
+func getStats() (int, int, int, int) {
+
+	var ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt int
+
+	db.Model(&order{}).Where("order_received IS NOT NULL").Count(&ordersReceivedInt)
+	db.Model(&order{}).Where("order_ready IS NOT NULL").Count(&ordersReadyInt)
+	db.Model(&order{}).Where("order_retrieved IS NOT NULL").Count(&ordersRetrievedInt)
+	db.Model(&coffeeListItem{}).Where("job_retrieved IS NULL").Count(&jobQueueLengthInt)
+
+	return ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt
+}
+
 // create a new order
 func newOrder(sentOrderID string, orderedCoffees []orderEntry) (string, bool, int, string) {
 	systemStatusCode, systemHTTPStatusCode, systemStatusMessage := systemStatus()
@@ -83,7 +100,6 @@ func newOrder(sentOrderID string, orderedCoffees []orderEntry) (string, bool, in
 	}
 
 	newOrder.OrderSize = newOrderSize
-	orderList = append(orderList, newOrder)
 	db.Create(&newOrder)
 
 	for _, item := range orderedCoffees {

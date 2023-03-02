@@ -8,6 +8,7 @@ package main
 import (
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/atarantini/ginrequestid"
@@ -86,6 +87,23 @@ func setupRouter() *gin.Engine {
 		c.String(http.StatusOK, "Welcome to the SchildCafé!")
 	})
 
+	r.GET("/order-list", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"data": listOrders()})
+	})
+
+	r.GET("/metrics", func(c *gin.Context) {
+
+		ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt := getStats()
+
+		ordersReceivedString := "# HELP orders_received The numbers of orders received by the system\n# TYPE orders_received counter\norders_received " + strconv.Itoa(ordersReceivedInt)
+		ordersReadyString := "# HELP orders_ready The numbers of orders the system has finished\n# TYPE orders_ready counter\norders_ready " + strconv.Itoa(ordersReadyInt)
+		ordersRetrievedString := "# HELP orders_retrieved The numbers of orders retrieved from the system\n# TYPE orders_retrieved counter\norders_retrieved " + strconv.Itoa(ordersRetrievedInt)
+		jobQueueLengthString := "#HELP job_queue_length The number of jobs currently in the queue\n#TYPE job_queue_length gauge\njob_queue_length " + strconv.Itoa(jobQueueLengthInt)
+
+		c.String(http.StatusOK, ordersReceivedString+"\n"+ordersReadyString+"\n"+ordersRetrievedString+"\n"+jobQueueLengthString)
+
+	})
+
 	// swagger:route GET /healthcheck healthReq
 	// Perform a healthcheck.
 	// If all is fine, this will tell you.
@@ -151,7 +169,7 @@ func getEnv(name string, defaultValue string) string {
 	return defaultValue
 }
 
-var db, dbErr = gorm.Open("mysql", getEnv("MYSQL_USER", "root")+":"+getEnv("MYSQL_PASS", "root")+"@tcp("+getEnv("MYSQL_SERVER", "localhost")+":"+getEnv("MYSQL_PORT", "3306")+")/"+getEnv("MYSQL_DB", "cafe")+"?charset=utf8&parseTime=True&loc=Local")
+var db, dbErr = gorm.Open("mysql", getEnv("MYSQL_USER", "root")+":"+getEnv("MYSQL_PASS", "root")+"@tcp("+getEnv("MYSQL_HOST", "localhost")+":"+getEnv("MYSQL_PORT", "3306")+")/"+getEnv("MYSQL_DB", "cafe")+"?charset=utf8&parseTime=True&loc=Local")
 
 func main() {
 	if dbErr != nil {
