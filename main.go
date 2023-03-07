@@ -119,7 +119,7 @@ func setupRouter() *gin.Engine {
 
 		//c.IndentedJSON(http.StatusOK, incomingOrder)
 
-		result, success, systemHTTPStatusCode, systemStatusMessage := newOrder(incomingOrder.ID, incomingOrder.Coffees)
+		resultID, success, systemHTTPStatusCode, systemStatusMessage := newOrder(incomingOrder.ID, incomingOrder.Coffees)
 
 		if !success {
 			log.WithFields(logrus.Fields{
@@ -130,9 +130,9 @@ func setupRouter() *gin.Engine {
 		} else {
 			log.WithFields(logrus.Fields{
 				"requestId": c.MustGet("RequestId"),
-				"OrderID":   result,
-			}).Info("Order accepted")
-			c.JSON(http.StatusOK, result)
+				"OrderID":   resultID,
+			}).Info("Order " + resultID + " accepted")
+			c.JSON(http.StatusOK, resultID)
 		}
 	})
 
@@ -145,13 +145,13 @@ func setupRouter() *gin.Engine {
 			log.WithFields(logrus.Fields{
 				"requestId": c.MustGet("RequestId"),
 				"errorCode": systemHTTPStatusCode,
-			}).Error("Error retrieving order: " + systemStatusMessage)
+			}).Error("Error retrieving order " + ID + ": " + systemStatusMessage)
 			c.JSON(systemHTTPStatusCode, gin.H{"message": systemStatusMessage})
 		} else {
 			log.WithFields(logrus.Fields{
 				"requestId": c.MustGet("RequestId"),
 				"OrderID":   result,
-			}).Info("Order retrieved")
+			}).Info("Order " + ID + " retrieved")
 			c.JSON(http.StatusOK, result)
 		}
 
