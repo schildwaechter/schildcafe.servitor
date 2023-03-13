@@ -15,6 +15,8 @@ require (
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/jinzhu/gorm v1.9.16
 	github.com/sirupsen/logrus v1.9.0
+	gorm.io/driver/mysql v1.4.7
+	gorm.io/gorm v1.24.6
 )
 
 require (

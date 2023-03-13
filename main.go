@@ -14,9 +14,10 @@ import (
 	"github.com/atarantini/ginrequestid"
 	formatters "github.com/fabienm/go-logrus-formatters"
 	"github.com/gin-gonic/gin"
-	"github.com/jinzhu/gorm"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 // Success response
@@ -169,14 +170,17 @@ func getEnv(name string, defaultValue string) string {
 	return defaultValue
 }
 
-var db, dbErr = gorm.Open("mysql", getEnv("MYSQL_USER", "root")+":"+getEnv("MYSQL_PASS", "root")+"@tcp("+getEnv("MYSQL_HOST", "localhost")+":"+getEnv("MYSQL_PORT", "3306")+")/"+getEnv("MYSQL_DB", "cafe")+"?charset=utf8&parseTime=True&loc=Local")
+var dsn = getEnv("MYSQL_USER", "root") + ":" + getEnv("MYSQL_PASS", "root") +
+	"@tcp(" + getEnv("MYSQL_HOST", "localhost") + ":" + getEnv("MYSQL_PORT", "3306") + ")/" +
+	getEnv("MYSQL_DB", "cafe") + "?charset=utf8mb4&parseTime=True&loc=Local"
+var db, dbErr = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
 func main() {
+
 	if dbErr != nil {
 		log.WithFields(logrus.Fields{}).Error("DB rror")
 		panic("failed to connect database")
 	}
-	defer db.Close()
 
 	//db.Debug().DropTableIfExists(&coffeeListItem{})
 	//db.Debug().DropTableIfExists(&order{})

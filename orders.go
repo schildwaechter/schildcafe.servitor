@@ -16,7 +16,7 @@ import (
 )
 
 type order struct {
-	ID             string    `json:"orderId" gorm:"primaryKey"`
+	ID             string    `json:"orderId" gorm:"type:varchar(50);primaryKey"`
 	OrderReceived  time.Time `json:"orderReceived"`
 	OrderReady     time.Time `json:"orderReady" gorm:"default:null"`
 	OrderRetrieved time.Time `json:"orderRetrieved" gorm:"default:null"`
@@ -35,13 +35,12 @@ type orderEntry struct {
 }
 
 type coffeeListItem struct {
-	ID            int    `gorm:"primary_key"`
+	ID            string `json:"jobID" gorm:"type:varchar(50);primary_key"`
 	Product       string `json:"coffeeProduct"`
 	OrderID       string `json:"orderId"`
 	Order         order
 	OrderReceived time.Time `json:"orderReceived"`
 	Machine       string    `json:"machine" gorm:"default:null"`
-	JobID         string    `json:"jobID"`
 	JobStarted    time.Time `json:"jobStarted" gorm:"default:null"`
 	JobReady      time.Time `json:"jobReady" gorm:"default:null"`
 	JobRetrieved  time.Time `json:"jobRetrieved" gorm:"default:null"`
@@ -71,14 +70,14 @@ func listOrders() []order {
 
 func getStats() (int, int, int, int) {
 
-	var ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt int
+	var ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt int64
 
 	db.Model(&order{}).Where("order_received IS NOT NULL").Count(&ordersReceivedInt)
 	db.Model(&order{}).Where("order_ready IS NOT NULL").Count(&ordersReadyInt)
 	db.Model(&order{}).Where("order_retrieved IS NOT NULL").Count(&ordersRetrievedInt)
 	db.Model(&coffeeListItem{}).Where("job_retrieved IS NULL").Count(&jobQueueLengthInt)
 
-	return ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt
+	return int(ordersReceivedInt), int(ordersReadyInt), int(ordersRetrievedInt), int(jobQueueLengthInt)
 }
 
 // create a new order
@@ -106,7 +105,7 @@ func newOrder(sentOrderID string, orderedCoffees []orderEntry) (string, bool, in
 		for i := 0; i < item.Count; i++ {
 			var newCoffee coffeeListItem
 			myCoffeeIDUUID, _ := uuid.NewV4()
-			newCoffee.JobID = myCoffeeIDUUID.String()
+			newCoffee.ID = myCoffeeIDUUID.String()
 			newCoffee.OrderID = newOrder.ID
 			newCoffee.Product = item.Product
 			newCoffee.OrderReceived = newOrder.OrderReceived
