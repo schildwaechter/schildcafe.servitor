@@ -6,10 +6,22 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+
+	//"go.opentelemetry.io/otel/codes"
 
 	"github.com/atarantini/ginrequestid"
 	formatters "github.com/fabienm/go-logrus-formatters"
@@ -19,6 +31,25 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
+
+func InitTracer(tracesEndpoint string) (*trace.TracerProvider, error) {
+	ctx := context.Background()
+	exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpoint(tracesEndpoint), otlptracehttp.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	tracerProvider := trace.NewTracerProvider(
+		trace.WithSampler(trace.AlwaysSample()),
+		trace.WithBatcher(exporter),
+		trace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("servitor"))),
+	)
+	otel.SetTracerProvider(tracerProvider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	return tracerProvider, nil
+}
 
 // Success response
 // swagger:response succResp
@@ -89,7 +120,12 @@ func setupRouter() *gin.Engine {
 	})
 
 	r.GET("/order-list", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"data": listOrders()})
+		tracer := otel.Tracer("order-list")
+		ctx, span := tracer.Start(c, "Order-List Endpoint")
+		requestId, _ := c.Get("RequestId")
+		span.SetAttributes(attribute.String("RequestID", requestId.(string)))
+		defer span.End()
+		c.JSON(http.StatusOK, gin.H{"data": listOrders(ctx, tracer)})
 	})
 
 	r.GET("/metrics", func(c *gin.Context) {
@@ -99,7 +135,7 @@ func setupRouter() *gin.Engine {
 		ordersReceivedString := "# HELP orders_received The numbers of orders received by the system\n# TYPE orders_received counter\norders_received " + strconv.Itoa(ordersReceivedInt)
 		ordersReadyString := "# HELP orders_ready The numbers of orders the system has finished\n# TYPE orders_ready counter\norders_ready " + strconv.Itoa(ordersReadyInt)
 		ordersRetrievedString := "# HELP orders_retrieved The numbers of orders retrieved from the system\n# TYPE orders_retrieved counter\norders_retrieved " + strconv.Itoa(ordersRetrievedInt)
-		jobQueueLengthString := "#HELP job_queue_length The number of jobs currently in the queue\n#TYPE job_queue_length gauge\njob_queue_length " + strconv.Itoa(jobQueueLengthInt)
+		jobQueueLengthString := "# HELP job_queue_length The number of jobs currently in the queue\n#TYPE job_queue_length gauge\njob_queue_length " + strconv.Itoa(jobQueueLengthInt)
 
 		c.String(http.StatusOK, ordersReceivedString+"\n"+ordersReadyString+"\n"+ordersRetrievedString+"\n"+jobQueueLengthString)
 
@@ -115,12 +151,18 @@ func setupRouter() *gin.Engine {
 	})
 
 	r.POST("/submit-order", func(c *gin.Context) {
+		tracer := otel.Tracer("submit-order")
+		ctx, span := tracer.Start(c, "Submit-Order Endpoint")
+		requestId, _ := c.Get("RequestId")
+		span.SetAttributes(attribute.String("RequestID", requestId.(string)))
+		defer span.End()
+
 		var incomingOrder orderSubmission
 		c.BindJSON(&incomingOrder)
 
 		//c.IndentedJSON(http.StatusOK, incomingOrder)
 
-		resultID, success, systemHTTPStatusCode, systemStatusMessage := newOrder(incomingOrder.ID, incomingOrder.Coffees)
+		resultID, success, systemHTTPStatusCode, systemStatusMessage := newOrder(ctx, tracer, incomingOrder.ID, incomingOrder.Coffees)
 
 		if !success {
 			log.WithFields(logrus.Fields{
@@ -138,9 +180,15 @@ func setupRouter() *gin.Engine {
 	})
 
 	r.GET("/retrieve-order/:ID", func(c *gin.Context) {
+		tracer := otel.Tracer("submit-order")
+		ctx, span := tracer.Start(c, "Submit-Order Endpoint")
+		requestId, _ := c.Get("RequestId")
+		span.SetAttributes(attribute.String("RequestID", requestId.(string)))
+		defer span.End()
+
 		ID := c.Param("ID")
 
-		result, success, systemHTTPStatusCode, systemStatusMessage := retrieveOrder(ID)
+		result, success, systemHTTPStatusCode, systemStatusMessage := retrieveOrder(ctx, tracer, ID)
 
 		if !success {
 			log.WithFields(logrus.Fields{
@@ -178,8 +226,27 @@ var db, dbErr = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 func main() {
 
 	if dbErr != nil {
-		log.WithFields(logrus.Fields{}).Error("DB rror")
+		log.WithFields(logrus.Fields{}).Error("DB error")
 		panic("failed to connect database")
+	}
+
+	err := db.Use(otelgorm.NewPlugin())
+	if err != nil {
+		panic("fatal error")
+	}
+
+	tracesEndpoint, ok := os.LookupEnv("OTEL_TRACES_ENDPOINT")
+	if ok {
+		tp, err := InitTracer(tracesEndpoint)
+		if err != nil {
+			log.WithFields(logrus.Fields{}).Error("Can't send traces")
+		}
+		defer func() {
+			_ = tp.Shutdown(context.Background())
+		}()
+		log.WithFields(logrus.Fields{}).Info("Sending traces to " + tracesEndpoint)
+	} else {
+		log.WithFields(logrus.Fields{}).Info("Not sending traces")
 	}
 
 	//db.Debug().DropTableIfExists(&coffeeListItem{})

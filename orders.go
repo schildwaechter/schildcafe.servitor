@@ -6,6 +6,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 	"github.com/gofrs/uuid"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	log "github.com/sirupsen/logrus"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type order struct {
@@ -63,8 +67,11 @@ func systemStatus() (int, int, string) {
 	return systemStatusCode, systemHTTPStatusCode, systemStatusMessage
 }
 
-func listOrders() []order {
-	db.Find(&orderList)
+func listOrders(ctx context.Context, tracer trace.Tracer) []order {
+	ctx, span := tracer.Start(ctx, "listOrders")
+	defer span.End()
+
+	db.WithContext(ctx).Find(&orderList)
 	return orderList
 }
 
@@ -81,8 +88,11 @@ func getStats() (int, int, int, int) {
 }
 
 // create a new order
-func newOrder(sentOrderID string, orderedCoffees []orderEntry) (string, bool, int, string) {
+func newOrder(ctx context.Context, tracer trace.Tracer, sentOrderID string, orderedCoffees []orderEntry) (string, bool, int, string) {
 	systemStatusCode, systemHTTPStatusCode, systemStatusMessage := systemStatus()
+
+	ctx, span := tracer.Start(ctx, "NewOrder")
+	defer span.End()
 
 	if !(systemStatusCode == 0) {
 		return "", false, systemHTTPStatusCode, systemStatusMessage
@@ -98,11 +108,15 @@ func newOrder(sentOrderID string, orderedCoffees []orderEntry) (string, bool, in
 		newOrderSize += item.Count
 	}
 
+	span.SetAttributes(attribute.String("orderUUID", myOrderIDUUID.String()))
+	span.AddEvent("Creating Order in database")
+
 	newOrder.OrderSize = newOrderSize
-	db.Create(&newOrder)
+	db.WithContext(ctx).Create(&newOrder)
 
 	for _, item := range orderedCoffees {
 		for i := 0; i < item.Count; i++ {
+			span.AddEvent("adding item in database")
 			var newCoffee coffeeListItem
 			myCoffeeIDUUID, _ := uuid.NewV4()
 			newCoffee.ID = myCoffeeIDUUID.String()
@@ -110,17 +124,18 @@ func newOrder(sentOrderID string, orderedCoffees []orderEntry) (string, bool, in
 			newCoffee.Product = item.Product
 			newCoffee.OrderReceived = newOrder.OrderReceived
 			coffeeList = append(coffeeList, newCoffee)
-			db.Create(&newCoffee)
-			log.WithFields(log.Fields{
-				"animal": "walrus",
-			}).Info(newCoffee)
+			db.WithContext(ctx).Create(&newCoffee)
+			log.Info(newCoffee)
 		}
 	}
 
 	return newOrder.ID, true, systemHTTPStatusCode, ""
 }
 
-func retrieveOrder(id string) (*order, bool, int, string) {
+func retrieveOrder(ctx context.Context, tracer trace.Tracer, id string) (*order, bool, int, string) {
+	ctx, span := tracer.Start(ctx, "retrieveOrder")
+	defer span.End()
+
 	systemStatusCode, systemHTTPStatusCode, systemStatusMessage := systemStatus()
 
 	if !(systemStatusCode == 0) {
@@ -128,7 +143,7 @@ func retrieveOrder(id string) (*order, bool, int, string) {
 	}
 
 	var thisOrder = order{ID: id}
-	result := db.Limit(1).Find(&thisOrder)
+	result := db.WithContext(ctx).Limit(1).Find(&thisOrder)
 
 	if !(result.RowsAffected == 1) {
 		return nil, false, http.StatusNotFound, "Order not found!"
@@ -140,7 +155,7 @@ func retrieveOrder(id string) (*order, bool, int, string) {
 
 	if thisOrder.OrderSize == thisOrder.OrderBrewed {
 		thisOrder.OrderRetrieved = time.Now().UTC()
-		db.Save(&thisOrder)
+		db.WithContext(ctx).Save(&thisOrder)
 		return &thisOrder, true, http.StatusOK, "Order delivered"
 	}
 
