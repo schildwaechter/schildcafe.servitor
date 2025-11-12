@@ -20,22 +20,30 @@ import (
 )
 
 type order struct {
-	ID             string    `json:"orderId" gorm:"type:varchar(50);primaryKey"`
-	OrderReceived  time.Time `json:"orderReceived"`
-	OrderReady     time.Time `json:"orderReady" gorm:"default:null"`
+	ID string `json:"orderId" gorm:"type:varchar(50);primaryKey"`
+	// Timestamp when the order was received
+	OrderReceived time.Time `json:"orderReceived"`
+	// Timestamp when the order was ready (0 before that)
+	OrderReady time.Time `json:"orderReady" gorm:"default:null"`
+	// Timestamp when the order was retrieved (0 before that)
 	OrderRetrieved time.Time `json:"orderRetrieved" gorm:"default:null"`
-	OrderSize      int       `json:"orderSize"`
-	OrderBrewed    int       `json:"orderBrewed"`
+	// Total number of coffees in the order
+	OrderSize int `json:"orderSize"`
+	// Number of coffees brewed so far
+	OrderBrewed int `json:"orderBrewed"`
 }
 
+// incoming order submission
 type orderSubmission struct {
+	// (optional) orderID
 	ID      string       `json:"orderId" gorm:"primaryKey"`
 	Coffees []orderEntry `json:"coffeeOrder"`
 }
 
+// A single entry in an order
 type orderEntry struct {
-	Product string `json:"product"`
-	Count   int    `json:"count"`
+	Product string `json:"product" example:"espresso"`
+	Count   int    `json:"count" example:"2"`
 }
 
 type coffeeListItem struct {

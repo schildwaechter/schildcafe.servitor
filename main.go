@@ -9,6 +9,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -22,6 +23,9 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 
 	//"go.opentelemetry.io/otel/codes"
+	docs "github.com/schildwaechter/schildcafe.servitor/docs"
+	swaggerfiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/atarantini/ginrequestid"
 	formatters "github.com/fabienm/go-logrus-formatters"
@@ -92,6 +96,8 @@ func myRequestLogger(log *logrus.Logger) gin.HandlerFunc {
 
 // rootHandler godoc
 // @Summary	Root endpoint
+// @Produce	plain
+// @Success	200	{string}	string	"Welcome to the SchildCafé!"
 // @Router	/ [get]
 func rootHandler(c *gin.Context) {
 	c.String(http.StatusOK, "Welcome to the SchildCafé!")
@@ -99,6 +105,8 @@ func rootHandler(c *gin.Context) {
 
 // orderListHandler godoc
 // @Summary	Get list of all orders
+// @Produce	json
+// @Success 200 {array} order	"List of orders"
 // @Router	/order-list [get]
 func orderListHandler(c *gin.Context) {
 	tracer := otel.Tracer("order-list")
@@ -111,6 +119,8 @@ func orderListHandler(c *gin.Context) {
 
 // metricsHandler godoc
 // @Summary	Get Prometheus metrics
+// @Produce text/plain
+// @Success 200 {string} string	"Prometheus metrics"
 // @Router	/metrics [get]
 func metricsHandler(c *gin.Context) {
 
@@ -136,6 +146,9 @@ func healthcheckHandler(c *gin.Context) {
 
 // submitOrderHandler godoc
 // @Summary	Submit a new order
+// @Accept	json
+// @Param	request	body	orderSubmission	true	"Order to submit"
+// @Success 200 {string} string	"Order ID"
 // @Router	/submit-order [post]
 func submitOrderHandler(c *gin.Context) {
 	tracer := otel.Tracer("submit-order")
@@ -268,7 +281,7 @@ func main() {
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
 	})
-
+	docs.SwaggerInfo.BasePath = "/api/v1"
 	r.GET("/", rootHandler)
 	r.GET("/order-list", orderListHandler)
 	r.GET("/metrics", metricsHandler)
@@ -276,5 +289,16 @@ func main() {
 	r.POST("/submit-order", submitOrderHandler)
 	r.GET("/retrieve-order/:ID", retrieveOrderHandler)
 
+	// Serve raw Swagger JSON/YAML files at /docs/
+	r.GET("/docs/swagger.json", func(c *gin.Context) {
+		wd, _ := os.Getwd()
+		c.File(filepath.Join(wd, "docs", "swagger.json"))
+	})
+	r.GET("/docs/swagger.yaml", func(c *gin.Context) {
+		wd, _ := os.Getwd()
+		c.File(filepath.Join(wd, "docs", "swagger.yaml"))
+	})
+	swaggerJSON := ginSwagger.URL("/docs/swagger.json")
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerfiles.Handler, swaggerJSON))
 	r.Run(":" + runPort)
 }

@@ -7,6 +7,8 @@ built with [Gin Gonic](https://gin-gonic.com/) and [GORM](https://gorm.io/).
 
 ## Installation
 
+Consider using [Air](https://github.com/air-verse/air).
+
 ```shell
 go mod tidy
 ```
