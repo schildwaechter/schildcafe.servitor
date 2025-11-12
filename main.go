@@ -90,123 +90,110 @@ func myRequestLogger(log *logrus.Logger) gin.HandlerFunc {
 	}
 }
 
-func setupRouter() *gin.Engine {
-	r := gin.New()
+// rootHandler godoc
+// @Summary	Root endpoint
+// @Router	/ [get]
+func rootHandler(c *gin.Context) {
+	c.String(http.StatusOK, "Welcome to the SchildCafé!")
+}
 
-	r.Use(ginrequestid.RequestId())
+// orderListHandler godoc
+// @Summary	Get list of all orders
+// @Router	/order-list [get]
+func orderListHandler(c *gin.Context) {
+	tracer := otel.Tracer("order-list")
+	ctx, span := tracer.Start(c, "Order-List Endpoint")
+	requestID, _ := c.Get("RequestId")
+	span.SetAttributes(attribute.String("RequestID", requestID.(string)))
+	defer span.End()
+	c.JSON(http.StatusOK, gin.H{"data": listOrders(ctx, tracer)})
+}
 
-	log := logrus.New()
+// metricsHandler godoc
+// @Summary	Get Prometheus metrics
+// @Router	/metrics [get]
+func metricsHandler(c *gin.Context) {
 
-	_, exists := os.LookupEnv("GELF_LOGGING")
-	if exists {
-		hostname, _ := os.Hostname()
-		log.SetFormatter(formatters.NewGelf(hostname))
-	}
+	ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt := getStats()
 
-	if gin.Mode() == "debug" {
-		log.Level = logrus.DebugLevel
+	ordersReceivedString := "# HELP orders_received The numbers of orders received by the system\n# TYPE orders_received counter\norders_received " + strconv.Itoa(ordersReceivedInt)
+	ordersReadyString := "# HELP orders_ready The numbers of orders the system has finished\n# TYPE orders_ready counter\norders_ready " + strconv.Itoa(ordersReadyInt)
+	ordersRetrievedString := "# HELP orders_retrieved The numbers of orders retrieved from the system\n# TYPE orders_retrieved counter\norders_retrieved " + strconv.Itoa(ordersRetrievedInt)
+	jobQueueLengthString := "# HELP job_queue_length The number of jobs currently in the queue\n#TYPE job_queue_length gauge\njob_queue_length " + strconv.Itoa(jobQueueLengthInt)
+
+	c.String(http.StatusOK, ordersReceivedString+"\n"+ordersReadyString+"\n"+ordersRetrievedString+"\n"+jobQueueLengthString)
+
+}
+
+// healthcheckHandler godoc
+// @Summary	Perform a healthcheck
+// @Description	If all is fine, this will tell you.
+// @Success 200
+// @Router	/healthcheck [get]
+func healthcheckHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Ok"})
+}
+
+// submitOrderHandler godoc
+// @Summary	Submit a new order
+// @Router	/submit-order [post]
+func submitOrderHandler(c *gin.Context) {
+	tracer := otel.Tracer("submit-order")
+	ctx, span := tracer.Start(c, "Submit-Order Endpoint")
+	requestID, _ := c.Get("RequestId")
+	span.SetAttributes(attribute.String("RequestID", requestID.(string)))
+	defer span.End()
+
+	var incomingOrder orderSubmission
+	c.BindJSON(&incomingOrder)
+
+	//c.IndentedJSON(http.StatusOK, incomingOrder)
+
+	resultID, success, systemHTTPStatusCode, systemStatusMessage := newOrder(ctx, tracer, incomingOrder.ID, incomingOrder.Coffees)
+
+	if !success {
+		log.WithFields(logrus.Fields{
+			"requestId": c.MustGet("RequestId"),
+			"errorCode": systemHTTPStatusCode,
+		}).Error("Error accepting order: " + systemStatusMessage)
+		c.JSON(systemHTTPStatusCode, gin.H{"message": systemStatusMessage})
 	} else {
-		log.Level = logrus.InfoLevel
+		log.WithFields(logrus.Fields{
+			"requestId": c.MustGet("RequestId"),
+			"OrderID":   resultID,
+		}).Info("Order " + resultID + " accepted")
+		c.JSON(http.StatusOK, resultID)
+	}
+}
+
+// retrieveOrderHandler godoc
+// @Summary	Retrieve an order
+// @Router	/retrieve-order/{ID} [get]
+func retrieveOrderHandler(c *gin.Context) {
+	tracer := otel.Tracer("submit-order")
+	ctx, span := tracer.Start(c, "Submit-Order Endpoint")
+	requestID, _ := c.Get("RequestId")
+	span.SetAttributes(attribute.String("RequestID", requestID.(string)))
+	defer span.End()
+
+	ID := c.Param("ID")
+
+	result, success, systemHTTPStatusCode, systemStatusMessage := retrieveOrder(ctx, tracer, ID)
+
+	if !success {
+		log.WithFields(logrus.Fields{
+			"requestId": c.MustGet("RequestId"),
+			"errorCode": systemHTTPStatusCode,
+		}).Error("Error retrieving order " + ID + ": " + systemStatusMessage)
+		c.JSON(systemHTTPStatusCode, gin.H{"message": systemStatusMessage})
+	} else {
+		log.WithFields(logrus.Fields{
+			"requestId": c.MustGet("RequestId"),
+			"OrderID":   result,
+		}).Info("Order " + ID + " retrieved")
+		c.JSON(http.StatusOK, result)
 	}
 
-	r.Use(myRequestLogger(log), gin.Recovery())
-
-	r.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
-	})
-
-	r.GET("/", func(c *gin.Context) {
-		c.String(http.StatusOK, "Welcome to the SchildCafé!")
-	})
-
-	r.GET("/order-list", func(c *gin.Context) {
-		tracer := otel.Tracer("order-list")
-		ctx, span := tracer.Start(c, "Order-List Endpoint")
-		requestId, _ := c.Get("RequestId")
-		span.SetAttributes(attribute.String("RequestID", requestId.(string)))
-		defer span.End()
-		c.JSON(http.StatusOK, gin.H{"data": listOrders(ctx, tracer)})
-	})
-
-	r.GET("/metrics", func(c *gin.Context) {
-
-		ordersReceivedInt, ordersReadyInt, ordersRetrievedInt, jobQueueLengthInt := getStats()
-
-		ordersReceivedString := "# HELP orders_received The numbers of orders received by the system\n# TYPE orders_received counter\norders_received " + strconv.Itoa(ordersReceivedInt)
-		ordersReadyString := "# HELP orders_ready The numbers of orders the system has finished\n# TYPE orders_ready counter\norders_ready " + strconv.Itoa(ordersReadyInt)
-		ordersRetrievedString := "# HELP orders_retrieved The numbers of orders retrieved from the system\n# TYPE orders_retrieved counter\norders_retrieved " + strconv.Itoa(ordersRetrievedInt)
-		jobQueueLengthString := "# HELP job_queue_length The number of jobs currently in the queue\n#TYPE job_queue_length gauge\njob_queue_length " + strconv.Itoa(jobQueueLengthInt)
-
-		c.String(http.StatusOK, ordersReceivedString+"\n"+ordersReadyString+"\n"+ordersRetrievedString+"\n"+jobQueueLengthString)
-
-	})
-
-	// swagger:route GET /healthcheck healthReq
-	// Perform a healthcheck.
-	// If all is fine, this will tell you.
-	// responses:
-	//  200: succResp
-	r.GET("/healthcheck", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"message": "Ok"})
-	})
-
-	r.POST("/submit-order", func(c *gin.Context) {
-		tracer := otel.Tracer("submit-order")
-		ctx, span := tracer.Start(c, "Submit-Order Endpoint")
-		requestId, _ := c.Get("RequestId")
-		span.SetAttributes(attribute.String("RequestID", requestId.(string)))
-		defer span.End()
-
-		var incomingOrder orderSubmission
-		c.BindJSON(&incomingOrder)
-
-		//c.IndentedJSON(http.StatusOK, incomingOrder)
-
-		resultID, success, systemHTTPStatusCode, systemStatusMessage := newOrder(ctx, tracer, incomingOrder.ID, incomingOrder.Coffees)
-
-		if !success {
-			log.WithFields(logrus.Fields{
-				"requestId": c.MustGet("RequestId"),
-				"errorCode": systemHTTPStatusCode,
-			}).Error("Error accepting order: " + systemStatusMessage)
-			c.JSON(systemHTTPStatusCode, gin.H{"message": systemStatusMessage})
-		} else {
-			log.WithFields(logrus.Fields{
-				"requestId": c.MustGet("RequestId"),
-				"OrderID":   resultID,
-			}).Info("Order " + resultID + " accepted")
-			c.JSON(http.StatusOK, resultID)
-		}
-	})
-
-	r.GET("/retrieve-order/:ID", func(c *gin.Context) {
-		tracer := otel.Tracer("submit-order")
-		ctx, span := tracer.Start(c, "Submit-Order Endpoint")
-		requestId, _ := c.Get("RequestId")
-		span.SetAttributes(attribute.String("RequestID", requestId.(string)))
-		defer span.End()
-
-		ID := c.Param("ID")
-
-		result, success, systemHTTPStatusCode, systemStatusMessage := retrieveOrder(ctx, tracer, ID)
-
-		if !success {
-			log.WithFields(logrus.Fields{
-				"requestId": c.MustGet("RequestId"),
-				"errorCode": systemHTTPStatusCode,
-			}).Error("Error retrieving order " + ID + ": " + systemStatusMessage)
-			c.JSON(systemHTTPStatusCode, gin.H{"message": systemStatusMessage})
-		} else {
-			log.WithFields(logrus.Fields{
-				"requestId": c.MustGet("RequestId"),
-				"OrderID":   result,
-			}).Info("Order " + ID + " retrieved")
-			c.JSON(http.StatusOK, result)
-		}
-
-	})
-
-	return r
 }
 
 // Get environment variable with a default
@@ -223,6 +210,8 @@ var dsn = getEnv("MYSQL_USER", "root") + ":" + getEnv("MYSQL_PASS", "root") +
 	getEnv("MYSQL_DB", "cafe") + "?charset=utf8mb4&parseTime=True&loc=Local"
 var db, dbErr = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
+// @title	SchildCafé Servitør
+// @license.name	Apache-2.0
 func main() {
 
 	if dbErr != nil {
@@ -256,6 +245,36 @@ func main() {
 
 	runPort := getEnv("SERVITOR_PORT", "1333")
 
-	r := setupRouter()
+	r := gin.New()
+
+	r.Use(ginrequestid.RequestId())
+
+	log := logrus.New()
+
+	_, exists := os.LookupEnv("GELF_LOGGING")
+	if exists {
+		hostname, _ := os.Hostname()
+		log.SetFormatter(formatters.NewGelf(hostname))
+	}
+
+	if gin.Mode() == "debug" {
+		log.Level = logrus.DebugLevel
+	} else {
+		log.Level = logrus.InfoLevel
+	}
+
+	r.Use(myRequestLogger(log), gin.Recovery())
+
+	r.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
+	})
+
+	r.GET("/", rootHandler)
+	r.GET("/order-list", orderListHandler)
+	r.GET("/metrics", metricsHandler)
+	r.GET("/healthcheck", healthcheckHandler)
+	r.POST("/submit-order", submitOrderHandler)
+	r.GET("/retrieve-order/:ID", retrieveOrderHandler)
+
 	r.Run(":" + runPort)
 }

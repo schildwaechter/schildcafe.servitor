@@ -17,6 +17,17 @@ or
 make prep
 ```
 
+## Compile
+
+```shell
+swag init
+go run .
+```
+
+```shell
+make run
+```
+
 ## Options
 
 To specify a port other then the default, set the environment variable

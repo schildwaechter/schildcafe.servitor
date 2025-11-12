@@ -16,6 +16,7 @@ test: prep lint
 	go test -v
 
 build: prep
+	swag init
 	go build -v -o servitor .
 
 run: build
