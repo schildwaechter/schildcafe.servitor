@@ -29,6 +29,7 @@ import (
 
 	"github.com/atarantini/ginrequestid"
 	formatters "github.com/fabienm/go-logrus-formatters"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -259,6 +260,8 @@ func main() {
 	runPort := getEnv("SERVITOR_PORT", "1333")
 
 	r := gin.New()
+	// all origins
+	r.Use(cors.Default())
 
 	r.Use(ginrequestid.RequestId())
 

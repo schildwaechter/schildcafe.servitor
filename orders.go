@@ -24,9 +24,9 @@ type order struct {
 	// Timestamp when the order was received
 	OrderReceived time.Time `json:"orderReceived"`
 	// Timestamp when the order was ready (0 before that)
-	OrderReady time.Time `json:"orderReady" gorm:"default:null"`
+	OrderReady time.Time `json:"orderReady,omitzero" gorm:"default:null"`
 	// Timestamp when the order was retrieved (0 before that)
-	OrderRetrieved time.Time `json:"orderRetrieved" gorm:"default:null"`
+	OrderRetrieved time.Time `json:"orderRetrieved,omitzero" gorm:"default:null"`
 	// Total number of coffees in the order
 	OrderSize int `json:"orderSize"`
 	// Number of coffees brewed so far

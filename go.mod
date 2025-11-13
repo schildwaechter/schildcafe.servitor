@@ -10,6 +10,7 @@ go 1.25
 require (
 	github.com/atarantini/ginrequestid v0.0.0-20210724204029-300df7d153f5
 	github.com/fabienm/go-logrus-formatters v1.0.0
+	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/gofrs/uuid v4.4.0+incompatible

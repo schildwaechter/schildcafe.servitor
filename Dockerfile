@@ -4,7 +4,7 @@
 # SPDX-Identifier: Apache-2.0
 
 # build the binary
-FROM golang:latest as builder
+FROM golang:latest AS builder
 WORKDIR /go/src/servitor
 COPY *.go /go/src/servitor/
 COPY go.* /go/src/servitor/

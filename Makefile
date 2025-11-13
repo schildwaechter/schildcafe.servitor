@@ -4,6 +4,8 @@
 # SPDX-Identifier: Apache-2.0
 
 prep:
+	go install -v github.com/swaggo/swag/cmd/swag@latest
+	swag init
 	go mod tidy
 
 lint:
