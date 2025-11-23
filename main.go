@@ -56,14 +56,20 @@ func InitTracer(tracesEndpoint string) (*trace.TracerProvider, error) {
 	return tracerProvider, nil
 }
 
-// Success response
-// swagger:response succResp
-type swaggSuccResp struct {
+// swaggResponse Swagger response object
+// swagger:response swaggResp
+type swaggResponse struct {
 	// in:body
 	Body struct {
 		// Detailed message
 		Message string `json:"message"`
 	}
+}
+
+// orderListResponse documents the wrapped response shape for the order list.
+// swagger:response orderListResponse
+type orderListResponse struct {
+	Data []order `json:"data"`
 }
 
 func myRequestLogger(log *logrus.Logger) gin.HandlerFunc {
@@ -107,7 +113,7 @@ func rootHandler(c *gin.Context) {
 // orderListHandler godoc
 // @Summary	Get list of all orders
 // @Produce	json
-// @Success 200 {array} order	"List of orders"
+// @Success 200 {object} orderListResponse	"List of orders"
 // @Router	/order-list [get]
 func orderListHandler(c *gin.Context) {
 	tracer := otel.Tracer("order-list")
@@ -139,7 +145,7 @@ func metricsHandler(c *gin.Context) {
 // healthcheckHandler godoc
 // @Summary	Perform a healthcheck
 // @Description	If all is fine, this will tell you.
-// @Success 200
+// @Success 200 {object} swaggResponse	"Ok"
 // @Router	/healthcheck [get]
 func healthcheckHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Ok"})
@@ -150,6 +156,7 @@ func healthcheckHandler(c *gin.Context) {
 // @Accept	json
 // @Param	request	body	orderSubmission	true	"Order to submit"
 // @Success 200 {string} string	"Order ID"
+// @Failure 500 {object} swaggResponse	"Unable to accept order"
 // @Router	/submit-order [post]
 func submitOrderHandler(c *gin.Context) {
 	tracer := otel.Tracer("submit-order")
@@ -182,6 +189,11 @@ func submitOrderHandler(c *gin.Context) {
 
 // retrieveOrderHandler godoc
 // @Summary	Retrieve an order
+// @Param ID path string true "Order ID"
+// @Success 200 {object} order "Order"
+// @Failure 404 {object} swaggResponse "Order not found"
+// @Failure 410 {object} swaggResponse "Order already delivered"
+// @Failure 503 {object} swaggResponse "Order not ready"
 // @Router	/retrieve-order/{ID} [get]
 func retrieveOrderHandler(c *gin.Context) {
 	tracer := otel.Tracer("submit-order")

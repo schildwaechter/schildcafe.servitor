@@ -107,7 +107,11 @@ func newOrder(ctx context.Context, tracer trace.Tracer, sentOrderID string, orde
 	}
 
 	var newOrder order
-	myOrderIDUUID, _ := uuid.NewV4()
+	// try to use sent order ID, otherwise create a new one
+	myOrderIDUUID, err := uuid.FromString(sentOrderID)
+	if err != nil {
+		myOrderIDUUID, _ = uuid.NewV4()
+	}
 	newOrder.ID = myOrderIDUUID.String()
 	newOrder.OrderReceived = time.Now().UTC()
 
