@@ -296,7 +296,7 @@ func main() {
 	r.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"code": "PAGE_NOT_FOUND", "message": "Page not found"})
 	})
-	docs.SwaggerInfo.BasePath = "/api/v1"
+	docs.SwaggerInfo.BasePath = "/"
 	r.GET("/", rootHandler)
 	r.GET("/order-list", orderListHandler)
 	r.GET("/metrics", metricsHandler)
